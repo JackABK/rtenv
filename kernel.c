@@ -5,7 +5,10 @@
 
 #include <stddef.h>
 
+#include <string.h>
+#include <stdio.h>
 void *memcpy(void *dest, const void *src, size_t n);
+void int2str(int , char *);
 
 int strcmp(const char *a, const char *b) __attribute__ ((naked));
 int strcmp(const char *a, const char *b)
@@ -39,6 +42,7 @@ size_t strlen(const char *s)
 	);
 }
 
+#if 0
 void puts(char *s)
 {
 	while (*s) {
@@ -47,6 +51,42 @@ void puts(char *s)
 		USART_SendData(USART2, *s);
 		s++;
 	}
+}
+#endif
+
+void print_msg(char *msg)
+{
+  if (!msg) return;
+
+  write(mq_open("/tmp/mqueue/out",0) , msg  , strlen(msg)+1);
+}
+
+void int_To_string(int in , char*out )
+{
+  int i, number_len=0; 
+  char out_tmp[10];
+ 
+
+
+  if(in == 0)
+  {
+    out[0] = '0';
+    out[1] = '\0';
+    return ;
+  }
+
+ 
+  while(in > 0)
+  {
+     out_tmp[number_len] = '0' +  (in % 10);
+     in /= 10;
+     number_len++;     
+  }  
+  
+  for(i=0; i<number_len; i++){
+     out[i] = out_tmp[number_len-1-i] ;
+  }    
+     out[number_len] = '\0';
 }
 
 #define STACK_SIZE 512 /* Size of task stacks in words */
@@ -104,6 +144,14 @@ struct task_control_block {
     struct task_control_block **prev;
     struct task_control_block  *next;
 };
+
+
+struct task_info {
+	size_t *task_count;
+	struct task_control_block *tasks;
+};
+
+struct task_info get_task_info ; 
 
 /* 
  * pathserver assumes that all files are FIFOs that were registered
@@ -314,6 +362,83 @@ void queue_str_task2()
 	queue_str_task("Hello 2\n", 50);
 }
 
+
+
+char *cat_task_status(int status)
+{
+	switch(status){
+           	case TASK_READY:
+			return "Ready";
+		case TASK_WAIT_READ:
+			return "Wait read";
+		case TASK_WAIT_WRITE:
+			return "Wait write";
+		case TASK_WAIT_INTR:
+			return "Wait intr";
+		case TASK_WAIT_TIME:
+			return "Wait time";
+		default:
+			return "Unknow this status";
+	}
+}
+
+void proc_cmd_and_do(char *cmd)
+{
+
+  int i;
+  char string_tmp[10];
+  if (!strncmp(cmd , "help",4)){
+    print_msg("\rhelp -- Display all command explanation\n");
+    print_msg("\recho -- Output the string\n");
+    print_msg("\rhello -- Display 'Hello JackABK' \n");
+    print_msg("\rps -- Display all tasks\r\n");
+  }
+  else if(!strncmp(cmd , "echo" , 4)){
+     
+    if( (!strncmp(cmd,"echo ",5) && (cmd[5]!=' '))){
+      print_msg(&cmd[5]);
+      print_msg("\r\n");
+    }	 
+    else{
+     // print_msg("Please input ");
+    }
+
+
+  }
+  else if(!strncmp(cmd ,"hello" , 4)){
+    print_msg("Hello! this is JackABK Homework\r\n"); 
+  }
+
+
+  else if(!strncmp(cmd , "ps" , 2)){
+     print_msg("----------------Show that the all task----------------\r\n");
+     print_msg("PID\t\tStatus\t\tPriority\r\n");
+     for(i=0; i < *get_task_info.task_count; i++){
+    
+        /*PID*/
+        int_To_string(get_task_info.tasks[i].pid , string_tmp);
+        print_msg(string_tmp);
+        print_msg("\t\t");
+        /*status*/
+       	print_msg(cat_task_status(get_task_info.tasks[i].status));
+	     /*Alignment the string length */
+             if (strlen(cat_task_status(get_task_info.tasks[i].status))>=6) print_msg("\t");
+	     else print_msg("\t\t");
+
+        /*priority*/
+        int_To_string(get_task_info.tasks[i].priority , string_tmp);
+        print_msg(string_tmp);
+	print_msg("\r\n");
+     }
+  }
+  else{
+	print_msg("'"); print_msg(cmd); print_msg("'");
+	print_msg(" command not found !!\r\n");
+  }
+    
+
+
+}
 void serial_readwrite_task()
 {
 	int fdout, fdin;
@@ -321,40 +446,54 @@ void serial_readwrite_task()
 	char ch;
 	int curr_char;
 	int done;
+	char ch_immediate[2];
 
 	fdout = mq_open("/tmp/mqueue/out", 0);
 	fdin = open("/dev/tty0/in", 0);
 
 	/* Prepare the response message to be queued. */
-	memcpy(str, "Got:", 4);
+  	print_msg("Welcome to the Week#1 HomeWorki\r\n");
 
 	while (1) {
-		curr_char = 4;
+		curr_char = 0;
 		done = 0;
+		print_msg("$");
+		
+		
+ 
 		do {
 			/* Receive a byte from the RS232 port (this call will
-			 * block). */
+			  block). Wating user input the string by this line */
 			read(fdin, &ch, 1);
 
 			/* If the byte is an end-of-line type character, then
 			 * finish the string and inidcate we are done.
 			 */
 			if (curr_char >= 98 || (ch == '\r') || (ch == '\n')) {
-				str[curr_char] = '\n';
-				str[curr_char+1] = '\0';
+				str[curr_char] =NULL;
+				str[curr_char+1] ='\0';
+
+
 				done = -1;
 				/* Otherwise, add the character to the
 				 * response string. */
 			}
 			else {
 				str[curr_char++] = ch;
+				ch_immediate[0] = ch;
+				print_msg(ch_immediate);
+ 				
 			}
 		} while (!done);
 
 		/* Once we are done building the response string, queue the
 		 * response to be sent to the RS232 port.
 		 */
-		write(fdout, str, curr_char+1+1);
+                print_msg("\r\n");
+	        proc_cmd_and_do(str);
+	
+
+ 		//print_msg(str_tmp);
 	}
 }
 
@@ -366,8 +505,8 @@ void first()
 	if (!fork()) setpriority(0, 0), serialout(USART2, USART2_IRQn);
 	if (!fork()) setpriority(0, 0), serialin(USART2, USART2_IRQn);
 	if (!fork()) rs232_xmit_msg_task();
-	if (!fork()) setpriority(0, PRIORITY_DEFAULT - 10), queue_str_task1();
-	if (!fork()) setpriority(0, PRIORITY_DEFAULT - 10), queue_str_task2();
+	//if (!fork()) setpriority(0, PRIORITY_DEFAULT - 10), queue_str_task1();
+	//if (!fork()) setpriority(0, PRIORITY_DEFAULT - 10), queue_str_task2();
 	if (!fork()) setpriority(0, PRIORITY_DEFAULT - 10), serial_readwrite_task();
 
 	setpriority(0, PRIORITY_LIMIT);
@@ -685,10 +824,17 @@ int main()
 	init_rs232();
 	__enable_irq();
 
+
+	get_task_info.tasks=tasks;	
+        get_task_info.task_count = &task_count;
+
+
+
 	tasks[task_count].stack = (void*)init_task(stacks[task_count], &first);
 	tasks[task_count].pid = 0;
 	tasks[task_count].priority = PRIORITY_DEFAULT;
 	task_count++;
+	
 
 	/* Initialize all pipes */
 	for (i = 0; i < PIPE_LIMIT; i++)
@@ -834,6 +980,17 @@ int main()
 			i++;
 		current_task = task_pop(&ready_list[i])->pid;
 	}
-
+					
 	return 0;
+
+
 }
+
+
+
+
+
+
+
+
+
