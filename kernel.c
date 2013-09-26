@@ -142,13 +142,9 @@ struct task_control_block {
     struct task_control_block  *next;
 };
 
-
-struct task_info {
-	size_t *task_count;
-	struct task_control_block *tasks;
-};
-
-struct task_info get_task_info ; 
+/*global var by use ps subroutine*/
+    size_t *task_count_global;
+    struct task_control_block *tasks_global;
 
 /* 
  * pathserver assumes that all files are FIFOs that were registered
@@ -361,7 +357,7 @@ void queue_str_task2()
 
 
 
-char *cat_task_status(int status)
+char *get_task_status(int status)
 {
 	switch(status){
            	case TASK_READY:
@@ -410,20 +406,20 @@ void proc_cmd_and_do(char *cmd)
   else if(!strncmp(cmd , "ps" , 2)){
      print_msg("----------------Show that the all task----------------\r\n");
      print_msg("PID\t\tStatus\t\tPriority\r\n");
-     for(i=0; i < *get_task_info.task_count; i++){
+     for(i=0; i < *task_count_global; i++){
     
         /*PID*/
-        int_To_string(get_task_info.tasks[i].pid , string_tmp);
+        int_To_string(tasks_global[i].pid , string_tmp);
         print_msg(string_tmp);
         print_msg("\t\t");
         /*status*/
-       	print_msg(cat_task_status(get_task_info.tasks[i].status));
+       	print_msg(get_task_status(tasks_global[i].status));
 	     /*Alignment the string length */
-             if (strlen(cat_task_status(get_task_info.tasks[i].status))>=6) print_msg("\t");
+             if (strlen(get_task_status(tasks_global[i].status))>=6) print_msg("\t");
 	     else print_msg("\t\t");
 
         /*priority*/
-        int_To_string(get_task_info.tasks[i].priority , string_tmp);
+        int_To_string(tasks_global[i].priority , string_tmp);
         print_msg(string_tmp);
 	print_msg("\r\n");
      }
@@ -822,8 +818,8 @@ int main()
 	__enable_irq();
 
 
-	get_task_info.tasks=tasks;	
-        get_task_info.task_count = &task_count;
+	tasks_global=tasks;	
+        task_count_global = &task_count;
 
 
 
