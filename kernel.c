@@ -62,24 +62,18 @@ void int_To_string(int in , char*out )
 {
   int i, number_len=0; 
   char out_tmp[10];
- 
-
-
   if(in == 0)
   {
     out[0] = '0';
     out[1] = '\0';
     return ;
   }
-
- 
   while(in > 0)
   {
      out_tmp[number_len] = '0' +  (in % 10);
      in /= 10;
      number_len++;     
   }  
-  
   for(i=0; i<number_len; i++){
      out[i] = out_tmp[number_len-1-i] ;
   }    
@@ -398,7 +392,7 @@ void proc_cmd_and_do(char *cmd)
 
 
   }
-  else if(!strncmp(cmd ,"hello" , 4)){
+  else if(!strncmp(cmd ,"hello" , 5)){
     print_msg("Hello! this is JackABK Homework\r\n"); 
   }
 
